@@ -3,7 +3,7 @@
 # 入力値チェック/セット
 #
 
-TOOL_VERSION="4.2.0"
+TOOL_VERSION="5.0.0"
 COLDKEYS_DIR='$HOME/cold-keys'
 
 # General exit handler
@@ -2879,7 +2879,14 @@ yes_no(){
 
 update(){
   printf "Update Check...\n"
-  wget -q https://raw.githubusercontent.com/btbf/spojapanguild/master/scripts/sjgtool.sh -O $NODE_HOME/scripts/sjgtool.sh.tmp
+
+  if ! wget -q https://raw.githubusercontent.com/kuhito-inc/sjg-tools/main/scripts/sjgtool.sh \
+    -O "$NODE_HOME/scripts/sjgtool.sh.tmp"; then
+    rm -f "$NODE_HOME/scripts/sjgtool.sh.tmp"
+    printf "Update check failed\n"
+    return 2
+  fi
+
   tmp256=$(sha256sum $NODE_HOME/scripts/sjgtool.sh.tmp | awk '{ print $1 }')
   sh256=$(sha256sum $NODE_HOME/scripts/sjgtool.sh | awk '{ print $1 }')
 
