@@ -2880,7 +2880,7 @@ yes_no(){
 update(){
   printf "Update Check...\n"
 
-  if ! wget -q https://raw.githubusercontent.com/kuhito-inc/sjg-tools/main/scripts/sjgtool.sh \
+  if ! wget -q https://raw.githubusercontent.com/kuhito-inc/sjg-tools/main/sjgtool.sh \
     -O "$NODE_HOME/scripts/sjgtool.sh.tmp"; then
     rm -f "$NODE_HOME/scripts/sjgtool.sh.tmp"
     printf "Update check failed\n"
