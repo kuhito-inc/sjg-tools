@@ -474,9 +474,6 @@ ${FG_MAGENTA}■プール資金出金($WALLET_PAY_ADDR_FILENAME)${NC}
     #fi
 
 
-    mempool_CHK=$(cat $CONFIG | jq ".TraceMempool")
-    p2p_CHK=$(cat $CONFIG | jq ".EnableP2P")
-
     get_pooldata
 
     #メトリクスKES
@@ -661,8 +658,8 @@ ${FG_MAGENTA}■プール資金出金($WALLET_PAY_ADDR_FILENAME)${NC}
       okCnt=$((${okCnt}+1))
     fi
 
-    #メトリクスTx数
-    metrics_tx=$(curl -s "$TRACER_METRICS_URL" | awk '$1 == "cardano_node_metrics_txsProcessedNum_counter" {print $2; exit}')
+    #メトリクスTx数（new tracing は _counter。旧形式の _int も許容）
+    metrics_tx=$(curl -s "$TRACER_METRICS_URL" | awk '$1 ~ /^cardano_node_metrics_txsProcessedNum(_counter|_int)?$/ {print $2; exit}')
     if [ -z "$metrics_tx" ]; then
       metrics_tx="0"
     fi
@@ -680,40 +677,46 @@ ${FG_MAGENTA}■プール資金出金($WALLET_PAY_ADDR_FILENAME)${NC}
       printf "\nノード起動後にTxを処理していません。1分後に再実行してください\n"
       printf "\n再実行してもNGの場合は、以下の点を再確認してください\n"
       printf "・BPのファイアウォールの設定\n"
-      printf "・リレーノードのトポロジーアップデーター設定(フェッチリストログファイルなど)\n"
-      printf "・リレーノードの$TOPOLOGYに当サーバーのIPが含まれているか\n\n"
+      printf "・リレーの topology.json の localRoots に当BPが含まれているか\n"
+      printf "・BPの topology.json の localRoots にリレーが含まれているか\n\n"
     fi
 
     echo
-    
-    peers_in=$(ss -tnp state established 2>/dev/null | grep "${CNODE_PID}," | grep -v "127.0.0.1" | awk -v port=":${CNODE_PORT}" '$3 ~ port {print}' | wc -l)
-    if [ $p2p_CHK = "true" ]; then
-      #ダイナミックP2P
-      peers_out=$(curl -s "$TRACER_METRICS_URL" | awk '$1 == "cardano_node_metrics_connectionManager_outboundConns_int" {print $2; exit}')
-      p2p_type="ダイナミックP2P(台帳P2P)"
 
-    else
-    #手動P2P
+    # node 10.6+ は P2P 固定。EnableP2P は config から削除済み。
+    # guild-operators env と同じ connectionManager メトリクスで判定する。
+    peer_metrics=$(curl -s "$TRACER_METRICS_URL")
+    peers_in=$(awk '$1 == "cardano_node_metrics_connectionManager_inboundConns_int" {print $2; exit}' <<< "$peer_metrics")
+    [[ -z $peers_in ]] && peers_in=$(awk '$1 == "cardano_node_metrics_connectionManager_incomingConns_int" {print $2; exit}' <<< "$peer_metrics")
+    peers_out=$(awk '$1 == "cardano_node_metrics_connectionManager_outboundConns_int" {print $2; exit}' <<< "$peer_metrics")
+    [[ -z $peers_out ]] && peers_out=$(awk '$1 == "cardano_node_metrics_connectionManager_outgoingConns_int" {print $2; exit}' <<< "$peer_metrics")
+    peers_duplex=$(awk '$1 == "cardano_node_metrics_connectionManager_fullDuplexConns_int" {print $2; exit}' <<< "$peer_metrics")
+    peers_bidir=$(awk '$1 == "cardano_node_metrics_connectionManager_duplexConns_int" {print $2; exit}' <<< "$peer_metrics")
+    [[ -z $peers_in ]] && peers_in=0
+    [[ -z $peers_out ]] && peers_out=0
+    [[ -z $peers_duplex ]] && peers_duplex=0
+    [[ -z $peers_bidir ]] && peers_bidir=0
 
-      peers_out=$(ss -tnp state established 2>/dev/null | grep "${CNODE_PID}," | awk -v port=":(${CNODE_PORT}|${EKG_PORT}|${PROM_PORT})" '$3 !~ port {print}' | wc -l)
-      p2p_type="マニュアルP2P(トポロジーアップデータ)"
-    fi
-  
-    if [[ $peers_in -eq 0 ]]; then
-      peer_in_judge=" ${FG_RED}NG${NC} リレーから接続されていません"
-    else
+    if [[ $peers_in -gt 0 || $peers_duplex -gt 0 || $peers_bidir -gt 0 ]]; then
       peer_in_judge=" ${FG_GREEN}OK${NC}"
+      [[ $peers_in -eq 0 ]] && peer_in_judge=" ${FG_GREEN}OK${NC} (duplex)"
       okCnt=$((${okCnt}+1))
-    fi
-    if [[ $peers_out -eq 0 ]]; then
-      peer_out_judge=" ${FG_RED}NG${NC} リレーに接続できていません"
     else
-      peer_out_judge=" ${FG_GREEN}OK${NC}"
-      okCnt=$((${okCnt}+1))
+      peer_in_judge=" ${FG_RED}NG${NC} リレーから接続されていません"
     fi
-    printf "${FG_MAGENTA}■Peer接続状況${NC}(${FG_YELLOW}${p2p_type}${NC})\n"
+    if [[ $peers_out -gt 0 || $peers_duplex -gt 0 || $peers_bidir -gt 0 ]]; then
+      peer_out_judge=" ${FG_GREEN}OK${NC}"
+      [[ $peers_out -eq 0 ]] && peer_out_judge=" ${FG_GREEN}OK${NC} (duplex)"
+      okCnt=$((${okCnt}+1))
+    else
+      peer_out_judge=" ${FG_RED}NG${NC} リレーに接続できていません"
+    fi
+    printf "${FG_MAGENTA}■Peer接続状況${NC}(${FG_YELLOW}P2P${NC})\n"
     printf "　incoming :${FG_YELLOW}$peers_in $peer_in_judge${NC}\n"
     printf "　outgoing :${FG_YELLOW}$peers_out $peer_out_judge${NC}\n"
+    if [[ $peers_duplex -gt 0 || $peers_bidir -gt 0 ]]; then
+      printf "　duplex   :${FG_YELLOW}$peers_duplex${NC}  bi-dir:${FG_YELLOW}$peers_bidir${NC}\n"
+    fi
 
     chain_Vrf_hash=$(cat $NODE_HOME/pooldata.txt | jq -r ".[0].vrf_key_hash")
 
