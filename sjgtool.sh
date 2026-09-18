@@ -714,9 +714,6 @@ ${FG_MAGENTA}■プール資金出金($WALLET_PAY_ADDR_FILENAME)${NC}
     printf "${FG_MAGENTA}■Peer接続状況${NC}(${FG_YELLOW}P2P${NC})\n"
     printf "　incoming :${FG_YELLOW}$peers_in $peer_in_judge${NC}\n"
     printf "　outgoing :${FG_YELLOW}$peers_out $peer_out_judge${NC}\n"
-    if [[ $peers_duplex -gt 0 || $peers_bidir -gt 0 ]]; then
-      printf "　duplex   :${FG_YELLOW}$peers_duplex${NC}  bi-dir:${FG_YELLOW}$peers_bidir${NC}\n"
-    fi
 
     chain_Vrf_hash=$(cat $NODE_HOME/pooldata.txt | jq -r ".[0].vrf_key_hash")
 
