@@ -1,7 +1,6 @@
 #!/bin/bash
 # shellcheck disable=SC1090,SC2086,SC2154,SC2034,SC2012,SC2140
 
-#!/usr/bin/env bash
 # shellcheck disable=SC1090,SC2086,SC2154,SC2034,SC2012,SC2140,SC2028
 
 ######################################
@@ -71,7 +70,7 @@ myExit() {
 
 usage() {
   cat <<-EOF
-		Usage: $(basename "$0") [-o] [-a] [-b <branch name>]
+		Usage: $(basename "$0") [-o] [-a] [-u] [-b <branch name>]
 		CNTools - The Cardano SPOs best friend
 		
 		-o    Activate offline mode - run CNTools in offline mode without node access, a limited set of functions available
@@ -179,7 +178,7 @@ while true; do # Main loop
 
   clear
         println DEBUG "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
-        println " >> ブロックログ @ Developed by Guild Operators & Customized by BTBF v2.0.0"
+        println " >> ブロックログ @ Developed by Guild Operators & Customized by BTBF v2.0.1"
         println DEBUG "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
         if ! command -v sqlite3 >/dev/null; then
           println ERROR "${FG_RED}ERROR${NC}: sqlite3 not found!"
@@ -190,17 +189,17 @@ while true; do # Main loop
         println DEBUG "実績一覧、または特定のエポックのブロック生成内訳を表示します\n"
         select_opt "[s] 実績一覧" "[e] エポック内訳" "[Esc] 終了"
         case $? in
-          0) getAnswerAnyCust epoch_enter "直近のエポック毎実績一覧を表示します (空Enterで直近10エポック、「2」なら直近2エポック)"
+          0) getAnswerAnyCust epoch_enter "直近のエポックごとの実績一覧を表示します（Enterのみで直近10エポック、「2」なら直近2エポック）"
              epoch_enter=${epoch_enter:-10}
              if ! isNumber ${epoch_enter}; then
                println ERROR "\n${FG_RED}ERROR${NC}: not a number"
                waitForInput && continue
              fi
-             view=1; view_output="${FG_YELLOW}[b] Block View${NC} | [i] Info"
+             view=1; view_output="${FG_YELLOW}[b] ブロック実績${NC} | [i] 情報"
              while true; do
                clear
                println DEBUG "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
-               println " >> ブロックログ @ Developed by Guild Operators & Customized by BTBF v2.0.0"
+               println " >> ブロックログ @ Developed by Guild Operators & Customized by BTBF v2.0.1"
                println DEBUG "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
                current_epoch=$(getEpoch)
                println DEBUG "現在のエポック: ${FG_LBLUE}${current_epoch}${NC}\n"
@@ -208,9 +207,9 @@ while true; do # Main loop
                  [[ $(sqlite3 "${BLOCKLOG_DB}" "SELECT EXISTS(SELECT 1 FROM blocklog WHERE epoch=$((current_epoch+1)) LIMIT 1);" 2>/dev/null) -eq 1 ]] && ((current_epoch++))
                  first_epoch=$(( current_epoch - epoch_enter ))
                  [[ ${first_epoch} -lt 0 ]] && first_epoch=0
-                 ideal_len=$(sqlite3 "${BLOCKLOG_DB}" "SELECT LENGTH(epoch_slots_ideal) FROM epochdata WHERE epoch BETWEEN ${first_epoch} and ${current_epoch} ORDER BY LENGTH(epoch_slots_ideal) DESC LIMIT 1;")
+                 ideal_len=$(sqlite3 "${BLOCKLOG_DB}" "SELECT LENGTH(epoch_slots_ideal) FROM epochdata WHERE epoch BETWEEN ${first_epoch} and ${current_epoch} ORDER BY LENGTH(epoch_slots_ideal) DESC LIMIT 1;" 2>/dev/null)
                  [[ ${ideal_len} -lt 5 ]] && ideal_len=5
-                 luck_len=$(sqlite3 "${BLOCKLOG_DB}" "SELECT LENGTH(max_performance) FROM epochdata WHERE epoch BETWEEN ${first_epoch} and ${current_epoch} ORDER BY LENGTH(max_performance) DESC LIMIT 1;")
+                 luck_len=$(sqlite3 "${BLOCKLOG_DB}" "SELECT LENGTH(max_performance) FROM epochdata WHERE epoch BETWEEN ${first_epoch} and ${current_epoch} ORDER BY LENGTH(max_performance) DESC LIMIT 1;" 2>/dev/null)
                  [[ $((luck_len+1)) -le 4 ]] && luck_len=4 || luck_len=$((luck_len+1))
                  printf '|' >&3; printf "%$((5+6+ideal_len+luck_len+7+9+6+7+6+7+27+2))s" | tr " " "=" >&3; printf '|\n' >&3
                  printf "| %-5s | %-6s | %-${ideal_len}s | %-${luck_len}s | ${FG_LBLUE}%-7s${NC} | ${FG_GREEN}%-9s${NC} | ${FG_RED}%-6s${NC} | ${FG_RED}%-7s${NC} | ${FG_RED}%-6s${NC} | ${FG_RED}%-7s${NC} |\n" "Epoch" "Leader" "Ideal" "Luck" "Adopted" "Confirmed" "Missed" "Ghosted" "Stolen" "Invalid" >&3
@@ -245,11 +244,11 @@ while true; do # Main loop
                  println OFF "Ghosted   - ハイトバトルまたはブロック伝播遅延が発生し、他のプールによってブロックが生成された数"
                  println OFF "Stolen    - 他プールと同一スロットにスケジュールが重なりスロットバトルが発生し"
                  println OFF "            他のプールによってブロックが生成された数"
-                 println OFF "Invalid   - プールで生成したブロックに問題が発生した数(KES更新ミスなど)"
+                 println OFF "Invalid   - プールで生成したブロックに問題が発生した数（KES更新ミスなど）"
                  println OFF "            [logmonitor]に表示されるコードで原因を調べることができます"
                fi
                echo
-               println OFF "[h] ホーム | ${view_output} | [*] Refresh"
+               println OFF "[h] ホーム | ${view_output} | [*] 更新"
                read -rsn1 key
                case ${key} in
                  h ) continue 2 ;;
@@ -260,7 +259,7 @@ while true; do # Main loop
              done
              ;;
           1) [[ $(sqlite3 "${BLOCKLOG_DB}" "SELECT EXISTS(SELECT 1 FROM blocklog WHERE epoch=$((current_epoch+1)) LIMIT 1);" 2>/dev/null) -eq 1 ]] && println DEBUG "\n${FG_YELLOW}次エポック[$((current_epoch+1))]のスロットリーダースケジュールが表示可能になっています${NC}"
-             echo && getAnswerAnyCust epoch_enter "表示したいエポックを入力してください (空Enterで現在のエポックを表示)"
+             echo && getAnswerAnyCust epoch_enter "表示したいエポックを入力してください（Enterのみで現在のエポックを表示）"
              [[ -z "${epoch_enter}" ]] && epoch_enter=${current_epoch}
              if [[ $(sqlite3 "${BLOCKLOG_DB}" "SELECT EXISTS(SELECT 1 FROM blocklog WHERE epoch=${epoch_enter} LIMIT 1);" 2>/dev/null) -eq 0 ]]; then
                println "${epoch_enter}エポックには生成されたブロックはありません"
@@ -270,7 +269,7 @@ while true; do # Main loop
              while true; do
                clear
                println DEBUG "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
-               println " >> ブロックログ @ Developed by Guild Operators & Customized by BTBF v2.0.0"
+               println " >> ブロックログ @ Developed by Guild Operators & Customized by BTBF v2.0.1"
                println DEBUG "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
                current_epoch=$(getEpoch)
                println DEBUG "現在のエポック  : ${FG_LBLUE}${current_epoch}${NC}"
@@ -298,18 +297,18 @@ while true; do # Main loop
                echo
                # print block table
                block_cnt=1
-               status_len=$(sqlite3 "${BLOCKLOG_DB}" "SELECT LENGTH(status) FROM blocklog WHERE epoch=${epoch_enter} ORDER BY LENGTH(status) DESC LIMIT 1;")
+               status_len=$(sqlite3 "${BLOCKLOG_DB}" "SELECT LENGTH(status) FROM blocklog WHERE epoch=${epoch_enter} ORDER BY LENGTH(status) DESC LIMIT 1;" 2>/dev/null)
                [[ ${status_len} -lt 6 ]] && status_len=6
-               block_len=$(sqlite3 "${BLOCKLOG_DB}" "SELECT LENGTH(block) FROM blocklog WHERE epoch=${epoch_enter} ORDER BY LENGTH(slot) DESC LIMIT 1;")
+               block_len=$(sqlite3 "${BLOCKLOG_DB}" "SELECT LENGTH(block) FROM blocklog WHERE epoch=${epoch_enter} ORDER BY LENGTH(block) DESC LIMIT 1;" 2>/dev/null)
                [[ ${block_len} -lt 5 ]] && block_len=5
-               slot_len=$(sqlite3 "${BLOCKLOG_DB}" "SELECT LENGTH(slot) FROM blocklog WHERE epoch=${epoch_enter} ORDER BY LENGTH(slot) DESC LIMIT 1;")
+               slot_len=$(sqlite3 "${BLOCKLOG_DB}" "SELECT LENGTH(slot) FROM blocklog WHERE epoch=${epoch_enter} ORDER BY LENGTH(slot) DESC LIMIT 1;" 2>/dev/null)
                [[ ${slot_len} -lt 4 ]] && slot_len=4
-               slot_in_epoch_len=$(sqlite3 "${BLOCKLOG_DB}" "SELECT LENGTH(slot_in_epoch) FROM blocklog WHERE epoch=${epoch_enter} ORDER BY LENGTH(slot_in_epoch) DESC LIMIT 1;")
+               slot_in_epoch_len=$(sqlite3 "${BLOCKLOG_DB}" "SELECT LENGTH(slot_in_epoch) FROM blocklog WHERE epoch=${epoch_enter} ORDER BY LENGTH(slot_in_epoch) DESC LIMIT 1;" 2>/dev/null)
                [[ ${slot_in_epoch_len} -lt 11 ]] && slot_in_epoch_len=11
                at_len=24
-               size_len=$(sqlite3 "${BLOCKLOG_DB}" "SELECT LENGTH(size) FROM blocklog WHERE epoch=${epoch_enter} ORDER BY LENGTH(size) DESC LIMIT 1;")
+               size_len=$(sqlite3 "${BLOCKLOG_DB}" "SELECT LENGTH(size) FROM blocklog WHERE epoch=${epoch_enter} ORDER BY LENGTH(size) DESC LIMIT 1;" 2>/dev/null)
                [[ ${size_len} -lt 4 ]] && size_len=4
-               hash_len=$(sqlite3 "${BLOCKLOG_DB}" "SELECT LENGTH(hash) FROM blocklog WHERE epoch=${epoch_enter} ORDER BY LENGTH(hash) DESC LIMIT 1;")
+               hash_len=$(sqlite3 "${BLOCKLOG_DB}" "SELECT LENGTH(hash) FROM blocklog WHERE epoch=${epoch_enter} ORDER BY LENGTH(hash) DESC LIMIT 1;" 2>/dev/null)
                [[ ${hash_len} -lt 4 ]] && hash_len=4
                if [[ ${view} -eq 1 ]]; then
                  printf '|' >&3; printf "%$((${#leader_cnt}+status_len+block_len+slot_len+slot_in_epoch_len+at_len+17))s" | tr " " "=" >&3; printf '|\n' >&3
@@ -358,11 +357,11 @@ while true; do # Main loop
                  println OFF "Ghosted   - ハイトバトルまたはブロック伝播遅延が発生し、他のプールによってブロックが生成された数"
                  println OFF "Stolen    - 他プールと同一スロットにスケジュールが重なりスロットバトルが発生し"
                  println OFF "            他のプールによってブロックが生成された数"
-                 println OFF "Invalid   - プールで生成したブロックに問題が発生した数(KES更新ミスなど)"
+                 println OFF "Invalid   - プールで生成したブロックに問題が発生した数（KES更新ミスなど）"
                  println OFF "            [logmonitor]に表示されるコードで原因を調べることができます"
                fi
                echo
-               println OFF "[h] ホーム | ${view_output} | [*] Refresh"
+               println OFF "[h] ホーム | ${view_output} | [*] 更新"
                read -rsn1 key
                case ${key} in
                  h ) continue 2 ;;
